@@ -304,18 +304,24 @@ function FactList({ facts, setFacts }) {
 }
 
 function Fact({ fact, setFacts }) {
-  async function handleVote() {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const isDisputed =
+    fact.votesInteresting + fact.votesMindblowing < fact.votesFalse;
+
+  async function handleVote(voteCate) {
     // when user click the button,
     // update the votes and retrieve the updated data from backend
 
     // 1. how to update the votes?
     // use supabase api
+    setIsUpdating(true);
     let query = supabase
       .from("facts")
-      .update({ votesInteresting: fact.votesInteresting + 1 })
+      .update({ [voteCate]: fact[voteCate] + 1 })
       .eq("id", fact.id)
       .select();
     const { data: updatedFact, error } = await query;
+    setIsUpdating(false);
 
     if (!error) {
       // only change the votes number of the fact which is updated
@@ -328,6 +334,7 @@ function Fact({ fact, setFacts }) {
   return (
     <li className="fact">
       <p>
+        {isDisputed ? <span class="disputed">[❗️ Disputed]</span> : null}
         {fact.text}
         <a
           className="source"
@@ -348,9 +355,21 @@ function Fact({ fact, setFacts }) {
         {fact.category}
       </span>
       <div className="vote-buttons">
-        <button onClick={handleVote}>👍 {fact.votesInteresting}</button>
-        <button>🤯 {fact.votesMindblowing}</button>
-        <button>⛔️ {fact.votesFalse}</button>
+        <button
+          onClick={() => handleVote("votesInteresting")}
+          disabled={isUpdating}
+        >
+          👍 {fact.votesInteresting}
+        </button>
+        <button
+          onClick={() => handleVote("votesMindblowing")}
+          disabled={isUpdating}
+        >
+          🤯 {fact.votesMindblowing}
+        </button>
+        <button onClick={() => handleVote("votesFalse")} disabled={isUpdating}>
+          ⛔️ {fact.votesFalse}
+        </button>
       </div>
     </li>
   );

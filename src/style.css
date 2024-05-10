@@ -116,6 +116,9 @@ h1 {
 .vote-buttons button:hover {
   background-color: #292524;
 }
+.vote-buttons button:disabled {
+  background-color: #57534e;
+}
 
 ul {
   list-style: none;
@@ -210,4 +213,9 @@ ul {
   .fact-form select {
     width: auto;
   }
+}
+
+.disputed {
+  color: red;
+  margin-right: 10px;
 }
