@@ -296,14 +296,35 @@ function FactList({ facts, setFacts }) {
     <section>
       <ul className="fact-list">
         {facts.map((f) => (
-          <Fact key={f.id} fact={f} />
+          <Fact key={f.id} fact={f} setFacts={setFacts} />
         ))}
       </ul>
     </section>
   );
 }
 
-function Fact({ fact }) {
+function Fact({ fact, setFacts }) {
+  async function handleVote() {
+    // when user click the button,
+    // update the votes and retrieve the updated data from backend
+
+    // 1. how to update the votes?
+    // use supabase api
+    let query = supabase
+      .from("facts")
+      .update({ votesInteresting: fact.votesInteresting + 1 })
+      .eq("id", fact.id)
+      .select();
+    const { data: updatedFact, error } = await query;
+
+    if (!error) {
+      // only change the votes number of the fact which is updated
+      // the other fact should be the same
+      setFacts((tokenFact) =>
+        tokenFact.map((f) => (f.id === fact.id ? updatedFact[0] : f))
+      ); // 我發現這裡如果不寫兩層 => 就一定會報錯，但我沒有很懂為什麼
+    }
+  }
   return (
     <li className="fact">
       <p>
@@ -327,7 +348,7 @@ function Fact({ fact }) {
         {fact.category}
       </span>
       <div className="vote-buttons">
-        <button>👍 {fact.votesInteresting}</button>
+        <button onClick={handleVote}>👍 {fact.votesInteresting}</button>
         <button>🤯 {fact.votesMindblowing}</button>
         <button>⛔️ {fact.votesFalse}</button>
       </div>
