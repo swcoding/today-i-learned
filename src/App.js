@@ -56,16 +56,31 @@ function App() {
 
   const [showForm, toggleShowForm] = useState(false);
   const [facts, setFacts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentCategory, setCurrentCategory] = useState("All");
+  const [isUploading, setIsUploading] = useState(false);
 
-  useEffect(function () {
-    async function fetchInitData() {
-      const { data: factsFromBackend, error } = await supabase
-        .from("facts")
-        .select("*");
-      setFacts(factsFromBackend);
-    }
-    fetchInitData();
-  }, []);
+  useEffect(
+    function () {
+      async function fetchInitData() {
+        setIsLoading(true);
+
+        let query = supabase.from("facts").select("*");
+        if (currentCategory !== "All")
+          query = query.eq("category", currentCategory);
+        const { data: factsFromBackend, error } = await query
+          .order("votesInteresting", { ascending: false })
+          .limit(100);
+
+        if (!error) {
+          setFacts(factsFromBackend);
+          setIsLoading(false);
+        } else alert("404");
+      }
+      fetchInitData();
+    },
+    [currentCategory]
+  );
 
   return (
     <>
@@ -77,15 +92,24 @@ function App() {
           facts={facts}
           setFacts={setFacts}
           toggleShowForm={toggleShowForm}
+          setIsUploading={setIsLoading}
         />
       ) : null}
 
       <main className="main">
-        <CategoryFilter />
-        <FactList facts={facts} setFacts={setFacts} />
+        <CategoryFilter setCurrentCategory={setCurrentCategory} />
+        {isLoading ? (
+          <Loader />
+        ) : (
+          <FactList facts={facts} setFacts={setFacts} />
+        )}
       </main>
     </>
   );
+}
+
+function Loader() {
+  return <p>Loading ...</p>;
 }
 
 function Header({ showForm, toggleShowForm }) {
@@ -119,13 +143,19 @@ function isValidHttpUrl(string) {
   return url.protocol === "http:" || url.protocol === "https:";
 }
 
-function NewFactForm({ facts, setFacts, toggleShowForm }) {
+function NewFactForm({
+  facts,
+  setFacts,
+  toggleShowForm,
+  isUploading,
+  setIsUploading,
+}) {
   const [text, setText] = useState("");
   const [source, setSource] = useState("http://example.com");
   const [category, setCategory] = useState("");
   const [error, setError] = useState("");
 
-  function handleSumbit(e) {
+  async function handleSumbit(e) {
     // 1. prevent reload
     e.preventDefault();
     console.log(text, source, category);
@@ -137,19 +167,33 @@ function NewFactForm({ facts, setFacts, toggleShowForm }) {
       console.log("Data is valid");
 
       // add a new fact
-      const newFact = {
-        id: Math.round(Math.random() * 1000000),
-        text: text,
-        source: source,
-        category: category,
-        votesInteresting: 0,
-        votesMindblowing: 0,
-        votesFalse: 0,
-        createdIn: new Date().getFullYear(),
-      };
+      // const newFact = {
+      //   id: Math.round(Math.random() * 1000000),
+      //   text: text,
+      //   source: source,
+      //   category: category,
+      //   votesInteresting: 0,
+      //   votesMindblowing: 0,
+      //   votesFalse: 0,
+      //   createdIn: new Date().getFullYear(),
+      // };
+
+      // upload a fact to supabase and get the new fact
+      setIsUploading(true);
+      const { data: newFact, error } = await supabase
+        .from("facts")
+        .insert([
+          {
+            text: text,
+            source: source,
+            category: category,
+          },
+        ])
+        .select();
+      setIsUploading(false);
 
       // display the new fact on the page: add the fact to the state
-      setFacts((facts) => [newFact, ...facts]);
+      setFacts((facts) => [...newFact, ...facts]);
 
       //  reset the input
       setText("");
@@ -171,6 +215,7 @@ function NewFactForm({ facts, setFacts, toggleShowForm }) {
           placeholder="Share a fact"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          disabled={isUploading}
         />
         <span className="tag">{200 - text.length}</span>
         <input
@@ -178,8 +223,12 @@ function NewFactForm({ facts, setFacts, toggleShowForm }) {
           placeholder="Trustworthy source..."
           value={source}
           onChange={(e) => setSource(e.target.value)}
+          disabled={isUploading}
         />
-        <select onChange={(e) => setCategory(e.target.value)}>
+        <select
+          onChange={(e) => setCategory(e.target.value)}
+          disabled={isUploading}
+        >
           <option value={category}>Choose category:</option>
           {CATEGORIES.map((token) => (
             <option key={token.name} value={token.name}>
@@ -188,14 +237,16 @@ function NewFactForm({ facts, setFacts, toggleShowForm }) {
           ))}
         </select>
 
-        <button className="btn">Post</button>
+        <button className="btn" disabled={isUploading}>
+          Post
+        </button>
       </form>
       {error ? <p>{error}</p> : null}
     </>
   );
 }
 
-function CategoryFilter() {
+function CategoryFilter({ setCurrentCategory }) {
   // render the filtered facts based on button
   // 先做一個假的 fake button
   // 讓 CATEGORIES 裡的每一種 category 都變成一個 button
@@ -204,17 +255,26 @@ function CategoryFilter() {
     <aside>
       <ul>
         <li className="category">
-          <button className="btn btn-all-categories">All</button>
+          <button
+            className="btn btn-all-categories"
+            onClick={() => setCurrentCategory("All")}
+          >
+            All
+          </button>
         </li>
         {CATEGORIES.map((token) => (
-          <CategoryButton key={token.name} category={token} />
+          <CategoryButton
+            key={token.name}
+            category={token}
+            setCurrentCategory={setCurrentCategory}
+          />
         ))}
       </ul>
     </aside>
   );
 }
 
-function CategoryButton({ category }) {
+function CategoryButton({ category, setCurrentCategory }) {
   return (
     <li className="category">
       <button
@@ -222,6 +282,7 @@ function CategoryButton({ category }) {
         style={{
           backgroundColor: category.color,
         }}
+        onClick={() => setCurrentCategory(category.name)}
       >
         {category.name}
       </button>
